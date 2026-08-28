@@ -216,12 +216,14 @@ export default function LocationView() {
                     <div>
                       <p className="font-medium text-sm">{t.date_from} → {t.date_to}</p>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        {t.status === 'processing' && 'Duke u gjeneruar...'}
+                        {t.status === 'processing' && `Duke u gjeneruar... ${t.progress || 0}%`}
                         {t.status === 'done' && `${t.photo_count} foto`}
                         {t.status === 'failed' && 'Dështoi gjenerimi'}
                       </p>
                     </div>
-                    {t.status === 'processing' && <div className="h-5 w-5 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />}
+                    {t.status === 'processing' && (
+                      <span className="text-sm font-semibold text-brand-600 dark:text-brand-400 tabular-nums">{t.progress || 0}%</span>
+                    )}
                     {t.status === 'done' && (
                       <a href={`/uploads/videos/${t.video_path}`} download className="text-sm font-semibold text-brand-600 dark:text-brand-400">
                         Shkarko ↓
@@ -229,6 +231,14 @@ export default function LocationView() {
                     )}
                     {t.status === 'failed' && <span className="text-lg">⚠️</span>}
                   </div>
+                  {t.status === 'processing' && (
+                    <div className="mt-3 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-brand-500 transition-all duration-500 ease-out"
+                        style={{ width: `${Math.max(4, t.progress || 0)}%` }}
+                      />
+                    </div>
+                  )}
                   {t.status === 'done' && (
                     <video src={`/uploads/videos/${t.video_path}`} controls className="mt-3 w-full rounded-lg bg-black" />
                   )}

@@ -78,10 +78,16 @@ CREATE TABLE IF NOT EXISTS timelapses (
   video_path TEXT,
   status TEXT NOT NULL DEFAULT 'processing',
   photo_count INTEGER DEFAULT 0,
+  progress INTEGER NOT NULL DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (location_id) REFERENCES locations(id)
 );
 `);
+
+const timelapseCols = db.prepare("PRAGMA table_info(timelapses)").all().map(c => c.name);
+if (!timelapseCols.includes('progress')) {
+  db.exec("ALTER TABLE timelapses ADD COLUMN progress INTEGER NOT NULL DEFAULT 0");
+}
 
 if (db.prepare('SELECT COUNT(*) c FROM admin_users').get().c === 0) {
   db.prepare('INSERT INTO admin_users (username, password_hash) VALUES (?, ?)')
@@ -384,7 +390,7 @@ app.get('/api/locations/:id/photos', auth, (req, res) => {
   const params = [loc.id];
   if (date_from) { sql += ' AND date(COALESCE(captured_at, created_at)) >= date(?)'; params.push(date_from); }
   if (date_to) { sql += ' AND date(COALESCE(captured_at, created_at)) <= date(?)'; params.push(date_to); }
-  sql += ' ORDER BY COALESCE(captured_at, created_at) ASC';
+  sql += ' ORDER BY COALESCE(captured_at, created_at) ASC, id ASC';
   res.json({ photos: db.prepare(sql).all(...params) });
 });
 
@@ -435,10 +441,13 @@ async function mapWithConcurrency(items, limit, fn) {
 async function buildTimelapse(timelapseId, locationId, photos) {
   const tmpDir = path.join(UPLOAD_VIDEOS, `tmp-${timelapseId}`);
   fs.mkdirSync(tmpDir, { recursive: true });
+  const setProgress = (p) => db.prepare('UPDATE timelapses SET progress=? WHERE id=?').run(p, timelapseId);
   try {
     // Per-photo overlay+resize runs with a few ffmpeg processes in parallel (each
     // frame is independent) instead of one-by-one — matters once someone generates
     // a month/year timelapse with hundreds of photos instead of just a handful.
+    // Frames contribute the first 90% of progress, the final concat/encode pass the rest.
+    let completed = 0;
     await mapWithConcurrency(photos, 4, async (photo, idx) => {
       const src = path.join(UPLOAD_PHOTOS, photo.filename);
       const dst = path.join(tmpDir, `frame-${String(idx + 1).padStart(5, '0')}.jpg`);
@@ -448,6 +457,8 @@ async function buildTimelapse(timelapseId, locationId, photos) {
         vf += `,drawtext=text='${label}':x=w-tw-24:y=h-th-24:fontsize=26:fontcolor=white:box=1:boxcolor=black@0.55:boxborderw=10`;
       }
       await run('ffmpeg', ['-y', '-i', src, '-vf', vf, dst]);
+      completed += 1;
+      setProgress(Math.round((completed / photos.length) * 90));
     });
     const outFile = `timelapse-${timelapseId}.mp4`;
     const outPath = path.join(UPLOAD_VIDEOS, outFile);
@@ -455,7 +466,7 @@ async function buildTimelapse(timelapseId, locationId, photos) {
       '-y', '-framerate', '1.25', '-i', path.join(tmpDir, 'frame-%05d.jpg'),
       '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-vf', 'fps=25', outPath
     ]);
-    db.prepare('UPDATE timelapses SET status=?, video_path=?, photo_count=? WHERE id=?')
+    db.prepare('UPDATE timelapses SET status=?, video_path=?, photo_count=?, progress=100 WHERE id=?')
       .run('done', outFile, photos.length, timelapseId);
   } catch (e) {
     console.error('timelapse error', e.message);
@@ -474,7 +485,7 @@ app.post('/api/locations/:id/timelapse', auth, (req, res) => {
     SELECT * FROM photos WHERE location_id=?
     AND date(COALESCE(captured_at, created_at)) >= date(?)
     AND date(COALESCE(captured_at, created_at)) <= date(?)
-    ORDER BY COALESCE(captured_at, created_at) ASC
+    ORDER BY COALESCE(captured_at, created_at) ASC, id ASC
   `).all(loc.id, date_from, date_to);
   if (photos.length < 2) return res.status(400).json({ error: 'Duhen të paktën 2 foto në këtë periudhë' });
   const info = db.prepare(
