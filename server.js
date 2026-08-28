@@ -419,22 +419,36 @@ function run(cmd, args) {
   });
 }
 
+async function mapWithConcurrency(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 async function buildTimelapse(timelapseId, locationId, photos) {
   const tmpDir = path.join(UPLOAD_VIDEOS, `tmp-${timelapseId}`);
   fs.mkdirSync(tmpDir, { recursive: true });
   try {
-    let i = 0;
-    for (const photo of photos) {
-      i += 1;
+    // Per-photo overlay+resize runs with a few ffmpeg processes in parallel (each
+    // frame is independent) instead of one-by-one — matters once someone generates
+    // a month/year timelapse with hundreds of photos instead of just a handful.
+    await mapWithConcurrency(photos, 4, async (photo, idx) => {
       const src = path.join(UPLOAD_PHOTOS, photo.filename);
-      const dst = path.join(tmpDir, `frame-${String(i).padStart(5, '0')}.jpg`);
+      const dst = path.join(tmpDir, `frame-${String(idx + 1).padStart(5, '0')}.jpg`);
       let vf = 'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black';
       if (photo.captured_at) {
         const label = escapeDrawtext(formatOverlay(photo.captured_at));
         vf += `,drawtext=text='${label}':x=w-tw-24:y=h-th-24:fontsize=26:fontcolor=white:box=1:boxcolor=black@0.55:boxborderw=10`;
       }
       await run('ffmpeg', ['-y', '-i', src, '-vf', vf, dst]);
-    }
+    });
     const outFile = `timelapse-${timelapseId}.mp4`;
     const outPath = path.join(UPLOAD_VIDEOS, outFile);
     await run('ffmpeg', [

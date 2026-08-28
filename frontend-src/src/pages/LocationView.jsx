@@ -27,6 +27,7 @@ export default function LocationView() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [genError, setGenError] = useState('');
+  const [generating, setGenerating] = useState(false);
   const [pendingFiles, setPendingFiles] = useState(null);
   const [batchDate, setBatchDate] = useState('');
   const fileInputRef = useRef(null);
@@ -52,7 +53,7 @@ export default function LocationView() {
     pollRef.current = setInterval(async () => {
       const list = await loadTimelapses();
       if (!list.some(t => t.status === 'processing')) clearInterval(pollRef.current);
-    }, 3000);
+    }, 1200);
     return () => clearInterval(pollRef.current);
   }, [loadTimelapses]);
 
@@ -84,9 +85,7 @@ export default function LocationView() {
     if (!pendingFiles) return;
     setUploading(true);
     try {
-      for (const file of pendingFiles) {
-        await uploadOne(file, 'upload', batchDate || null);
-      }
+      await Promise.all(pendingFiles.map(file => uploadOne(file, 'upload', batchDate || null)));
       setPendingFiles(null);
       setBatchDate('');
       await loadAll();
@@ -103,11 +102,14 @@ export default function LocationView() {
   const generate = async (e) => {
     e.preventDefault();
     setGenError('');
+    setGenerating(true);
     try {
       await api.createTimelapse(id, { date_from: dateFrom, date_to: dateTo });
-      loadTimelapses();
+      await loadTimelapses();
     } catch (err) {
       setGenError(err.message);
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -198,8 +200,9 @@ export default function LocationView() {
                 </div>
               </div>
               {genError && <p className="text-sm text-red-500 mt-2">{genError}</p>}
-              <button className="mt-4 w-full h-11 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-semibold">
-                Gjenero Video
+              <button disabled={generating} className="mt-4 w-full h-11 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-semibold disabled:opacity-60 flex items-center justify-center gap-2">
+                {generating && <div className="h-4 w-4 rounded-full border-2 border-white/70 border-t-transparent animate-spin" />}
+                {generating ? 'Duke filluar...' : 'Gjenero Video'}
               </button>
             </form>
 
