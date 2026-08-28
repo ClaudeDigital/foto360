@@ -1,0 +1,9 @@
+node_modules/
+data/
+uploads/photos/*
+uploads/videos/*
+!uploads/photos/.gitkeep
+!uploads/videos/.gitkeep
+.env
+frontend-src/node_modules/
+frontend/
