@@ -232,30 +232,69 @@ app.get('/api/orders/mine', auth, (req, res) => {
   res.json({ orders });
 });
 
-// ---------- Telegram webhook ----------
-app.post('/api/telegram/webhook', async (req, res) => {
-  const update = req.body;
-  if (update.callback_query) {
-    const cq = update.callback_query;
-    const [action, idStr] = (cq.data || '').split(':');
-    const orderId = parseInt(idStr, 10);
-    const order = applyOrderDecision(orderId, action === 'approve');
-    if (order) {
-      const user = db.prepare('SELECT * FROM users WHERE id=?').get(order.user_id);
-      const label = action === 'approve' ? '✅ Konfirmuar' : '❌ Refuzuar';
-      const planLabel = order.plan === 'full' ? 'Full Access (€10)' : 'Limited Access (€1)';
-      await tg('editMessageText', {
-        chat_id: cq.message.chat.id,
-        message_id: cq.message.message_id,
-        text: `${label}\n\n👤 ${user.name}\n✉️ ${user.email}\n📦 Plani: ${planLabel}\n\nID Porosia: #${order.id}`,
-        parse_mode: 'Markdown'
-      });
-      await tg('answerCallbackQuery', { callback_query_id: cq.id, text: label });
-    } else {
-      await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'Kjo porosi është përpunuar tashmë' });
-    }
+// ---------- Telegram webhook router ----------
+// The BigBot token is shared across all gezimm.com projects (turn, gesim, foto360, ...),
+// but Telegram allows only ONE webhook URL per bot. This endpoint is registered as that
+// single URL and forwards each update to the right project based on its callback_data
+// shape, so every project keeps handling its own approvals unmodified.
+const ROUTER_SECRET = process.env.TELEGRAM_SECRET_TOKEN || '';
+const OTHER_PROJECT_WEBHOOKS = [
+  { pattern: /^(confirm_order|reject_order)_\d+$/, url: 'https://turn.gezimm.com/api/telegram/webhook' },
+  { pattern: /^(confirm|cancel)_\d+$/, url: 'https://gesim.gezimm.com/api/telegram/webhook' }
+];
+
+async function handleFoto360Callback(update) {
+  const cq = update.callback_query;
+  const [action, idStr] = (cq.data || '').split(':');
+  const orderId = parseInt(idStr, 10);
+  const order = applyOrderDecision(orderId, action === 'approve');
+  if (order) {
+    const user = db.prepare('SELECT * FROM users WHERE id=?').get(order.user_id);
+    const label = action === 'approve' ? '✅ Konfirmuar' : '❌ Refuzuar';
+    const planLabel = order.plan === 'full' ? 'Full Access (€10)' : 'Limited Access (€1)';
+    await tg('editMessageText', {
+      chat_id: cq.message.chat.id,
+      message_id: cq.message.message_id,
+      text: `${label}\n\n👤 ${user.name}\n✉️ ${user.email}\n📦 Plani: ${planLabel}\n\nID Porosia: #${order.id}`,
+      parse_mode: 'Markdown'
+    });
+    await tg('answerCallbackQuery', { callback_query_id: cq.id, text: label });
+  } else {
+    await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'Kjo porosi është përpunuar tashmë' });
+  }
+}
+
+app.post('/api/telegram/router', async (req, res) => {
+  if (ROUTER_SECRET) {
+    const got = req.headers['x-telegram-bot-api-secret-token'];
+    if (got !== ROUTER_SECRET) return res.sendStatus(401);
   }
   res.sendStatus(200);
+  const update = req.body;
+  const data = update?.callback_query?.data || '';
+  const target = OTHER_PROJECT_WEBHOOKS.find(t => t.pattern.test(data));
+  try {
+    if (target) {
+      await fetch(target.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(update)
+      });
+    } else if (/^(approve|reject):\d+$/.test(data) && update.callback_query) {
+      await handleFoto360Callback(update);
+    }
+  } catch (e) {
+    console.error('telegram router error', e.message);
+  }
+});
+
+// Kept for direct testing / backward compatibility — real traffic arrives via /router above.
+app.post('/api/telegram/webhook', async (req, res) => {
+  res.sendStatus(200);
+  const update = req.body;
+  if (update.callback_query && /^(approve|reject):\d+$/.test(update.callback_query.data || '')) {
+    await handleFoto360Callback(update);
+  }
 });
 
 // ---------- Locations ----------
