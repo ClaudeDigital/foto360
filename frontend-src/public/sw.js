@@ -1,6 +1,6 @@
 // foto360 service worker — makes the app installable and keeps the shell
 // working on flaky mobile connections. API calls always go to the network.
-const VERSION = 'foto360-v2';
+const VERSION = 'foto360-v3';
 const SHELL = `${VERSION}-shell`;
 const RUNTIME = `${VERSION}-runtime`;
 const PRECACHE = ['/', '/index.html', '/manifest.webmanifest', '/logo.svg', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png'];

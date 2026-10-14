@@ -6,59 +6,78 @@
   html, body, #root { min-height: 100%; }
   html { -webkit-text-size-adjust: 100%; }
   body {
-    @apply bg-slate-50 text-slate-900 antialiased dark:bg-ink-950 dark:text-slate-100;
+    @apply text-slate-900 antialiased dark:text-slate-100;
+    background-color: #e7e9e4;
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior-y: none;
+    font-feature-settings: 'ss01';
   }
+  .dark body { background-color: #121614; }
   /* iOS zooms into inputs below 16px — keep form fields at 16px on phones. */
   input, select, textarea { font-size: 16px; }
   @media (min-width: 640px) { input, select, textarea { font-size: 15px; } }
   button { -webkit-user-select: none; user-select: none; }
+  :focus-visible { outline: 2px solid #ff7b1c; outline-offset: 2px; }
+  ::selection { background: #ffc89c; color: #1b201e; }
 }
 
 @layer components {
+  .font-display { font-family: theme('fontFamily.display'); letter-spacing: -0.01em; }
+
   .btn {
-    @apply inline-flex items-center justify-center gap-2 h-12 px-5 rounded-2xl font-semibold transition
-           active:scale-[0.97] disabled:opacity-60 disabled:active:scale-100 select-none;
+    @apply inline-flex items-center justify-center gap-2 h-12 px-5 rounded-xl font-semibold transition
+           active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100 select-none;
   }
-  .btn-primary { @apply btn bg-brand-gradient text-white shadow-glow; }
+  /* Primary actions are graphite; orange is kept for the shutter and dates. */
+  .btn-primary {
+    @apply btn bg-slate-900 text-slate-50 hover:bg-slate-800
+           dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-white;
+  }
+  .btn-shutter { @apply btn bg-stamp-500 text-slate-950 hover:bg-stamp-400 shadow-glow; }
   .btn-secondary {
-    @apply btn bg-white text-slate-800 border border-slate-200 shadow-sm
-           dark:bg-slate-800/70 dark:text-slate-100 dark:border-slate-700;
+    @apply btn bg-slate-50 text-slate-800 border border-slate-300 hover:border-slate-400
+           dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:hover:border-slate-600;
   }
-  .btn-ghost { @apply btn bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800; }
-  .btn-danger { @apply btn bg-red-600 text-white hover:bg-red-700; }
+  .btn-ghost { @apply btn bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800; }
+  .btn-danger { @apply btn bg-red-700 text-white hover:bg-red-800; }
 
   .input {
-    @apply w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 outline-none transition
-           placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15
-           dark:border-slate-700 dark:bg-slate-900 dark:placeholder:text-slate-500;
+    @apply w-full h-12 rounded-xl border border-slate-300 bg-slate-50 px-4 outline-none transition
+           placeholder:text-slate-400 focus:border-slate-900 focus:ring-4 focus:ring-stamp-500/20
+           dark:border-slate-700 dark:bg-slate-900 dark:placeholder:text-slate-500 dark:focus:border-slate-300;
   }
-  .label { @apply block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5; }
+  .label { @apply block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5; }
 
   .card {
-    @apply rounded-3xl bg-white border border-slate-200/80 shadow-soft
-           dark:bg-slate-900/80 dark:border-slate-800;
+    @apply rounded-2xl bg-slate-50 border border-slate-300/70
+           dark:bg-slate-900 dark:border-slate-800;
   }
-  .chip { @apply inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full; }
+  .chip { @apply inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md; }
 
-  .segmented { @apply flex gap-1 p-1 rounded-2xl bg-slate-200/60 dark:bg-slate-800/70; }
+  .segmented { @apply flex gap-1 p-1 rounded-xl bg-slate-300/50 dark:bg-slate-900; }
   .segmented > button {
-    @apply flex-1 h-10 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-400 transition;
+    @apply flex-1 h-10 rounded-lg text-sm font-semibold text-slate-500 dark:text-slate-400 transition;
   }
   .segmented > button[aria-selected='true'] {
-    @apply bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white;
+    @apply bg-slate-50 text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white;
   }
 
+  /* A photographic print: thin white border, slight lift. */
+  .print { @apply rounded-print bg-white p-1.5 shadow-print dark:bg-slate-800; }
+
   .skeleton {
-    @apply bg-slate-200 dark:bg-slate-800;
-    background-image: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%);
+    @apply bg-slate-300/60 dark:bg-slate-800;
+    background-image: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
     background-size: 200% 100%;
     animation: shimmer 1.6s linear infinite;
   }
-  .dark .skeleton { background-image: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%); }
+  .dark .skeleton { background-image: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 50%, transparent 100%); }
 
   .spinner { @apply h-5 w-5 rounded-full border-2 border-current border-t-transparent animate-spin; }
+
+  /* LED date imprint glow — used by <DateStamp>. */
+  .led { color: #ff7b1c; filter: drop-shadow(0 0 1.5px rgba(255,123,28,0.9)) drop-shadow(0 0 6px rgba(255,110,20,0.45)); }
+  .led-off { color: rgba(255,123,28,0.07); }
 }
 
 @layer utilities {
@@ -68,6 +87,9 @@
   .bottom-nav-offset { bottom: calc(5rem + env(safe-area-inset-bottom)); }
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { scrollbar-width: none; }
+  .tnum { font-variant-numeric: tabular-nums; }
+  /* Concrete grain so large flat areas don't look like a blank web page. */
+  .grain { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
 }
 
 @media (prefers-reduced-motion: reduce) {

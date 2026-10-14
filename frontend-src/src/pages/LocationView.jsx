@@ -9,15 +9,17 @@ import Sheet from '../components/Sheet.jsx';
 import Icon from '../components/Icon.jsx';
 import Thumb from '../components/Thumb.jsx';
 import Spinner, { FullPageSpinner } from '../components/Spinner.jsx';
-import { formatRange, isToday, photoDate, toInputDate } from '../utils.js';
+import { MONTHS, MONTHS_SHORT, capitalize, daysAgo, fmtDay, fmtTime, fmtWeekday, formatRange, isToday, photoDate, toInputDate } from '../utils.js';
+import DateStamp, { stampText } from '../components/DateStamp.jsx';
 
-function groupByDay(photos) {
+// Contact sheet by month: most people take one photo a day, so grouping by day
+// would leave a whole row for every single picture.
+function groupByMonth(photos) {
   const groups = [];
   const byKey = {};
-  // newest day first in the gallery
   [...photos].reverse().forEach(p => {
     const d = photoDate(p);
-    const key = d.toLocaleDateString('sq-AL', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+    const key = `${capitalize(MONTHS[d.getMonth()])} ${d.getFullYear()}`;
     if (!byKey[key]) { byKey[key] = []; groups.push([key, byKey[key]]); }
     byKey[key].push(p);
   });
@@ -204,7 +206,7 @@ export default function LocationView() {
     } catch { /* user cancelled */ }
   };
 
-  const groups = useMemo(() => groupByDay(photos), [photos]);
+  const groups = useMemo(() => groupByMonth(photos), [photos]);
   const indexById = useMemo(() => Object.fromEntries(photos.map((p, i) => [p.id, i])), [photos]);
   const inRange = useMemo(() => photos.filter(p => {
     const k = toInputDate(photoDate(p));
@@ -220,10 +222,10 @@ export default function LocationView() {
     <div className="pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
       <TopBar
         title={location.name}
-        subtitle={location.description || `${photos.length} foto`}
+        subtitle={location.description || (photos.length ? `${photos.length} foto` : 'Ende pa foto')}
         back="/dashboard"
         right={
-          <button onClick={() => setMenu(true)} aria-label="Më shumë" className="h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center active:scale-90">
+          <button onClick={() => setMenu(true)} aria-label="Më shumë" className="h-10 w-10 rounded-lg hover:bg-slate-300/50 dark:hover:bg-slate-800 flex items-center justify-center active:scale-90">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
           </button>
         }
@@ -240,46 +242,55 @@ export default function LocationView() {
             {uploading && (
               <div className="card p-4 mb-4">
                 <div className="flex items-center justify-between text-sm font-medium">
-                  <span className="flex items-center gap-2 text-brand-600 dark:text-brand-400"><Spinner className="h-4 w-4" /> Duke ngarkuar...</span>
+                  <span className="flex items-center gap-2 text-slate-700 dark:text-slate-300"><Spinner className="h-4 w-4" /> Duke ngarkuar...</span>
                   <span className="tabular-nums text-slate-500">{uploading.done}/{uploading.total}</span>
                 </div>
                 <div className="mt-3 h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                  <div className="h-full bg-brand-gradient transition-all duration-300" style={{ width: `${(uploading.done / uploading.total) * 100}%` }} />
+                  <div className="h-full bg-stamp-500 transition-all duration-300" style={{ width: `${(uploading.done / uploading.total) * 100}%` }} />
                 </div>
               </div>
             )}
 
+            {last && (
+              <button onClick={() => setViewer(photos.length - 1)} className="block w-full print mb-5 text-left active:scale-[0.99] transition">
+                <div className="relative aspect-[4/3] overflow-hidden rounded-[3px] bg-slate-300 dark:bg-slate-900">
+                  <Thumb filename={last.filename} alt="Fotoja e fundit" />
+                  <div className="absolute right-3 bottom-3"><DateStamp value={stampText(photoDate(last))} height={18} /></div>
+                </div>
+                <div className="px-1.5 pt-2.5 pb-1 flex items-baseline justify-between gap-3">
+                  <span className="font-display font-extrabold text-2xl leading-none">Dita {daysAgo(photoDate(photos[0])) + 1}</span>
+                  <span className="text-sm text-slate-500 dark:text-slate-400 tnum">Fotoja e fundit: {doneToday ? 'sot' : fmtDay(photoDate(last))}, {fmtTime(photoDate(last))}</span>
+                </div>
+              </button>
+            )}
+
             {photos.length > 0 && !doneToday && (
-              <button onClick={() => setShowCamera(true)} className="w-full card p-4 mb-5 flex items-center gap-3 text-left active:scale-[0.99] transition">
-                <span className="h-11 w-11 rounded-2xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-300 flex items-center justify-center shrink-0"><Icon name="clock" /></span>
+              <button onClick={() => setShowCamera(true)} className="w-full rounded-2xl border-2 border-stamp-500/70 bg-stamp-50 dark:bg-stamp-950/40 p-4 mb-6 flex items-center gap-3 text-left active:scale-[0.99] transition">
+                <span className="h-11 w-11 rounded-full bg-stamp-500 text-slate-950 flex items-center justify-center shrink-0"><Icon name="camera" size={20} /></span>
                 <span className="flex-1">
-                  <span className="block font-semibold">Fotoja e sotme mungon</span>
-                  <span className="block text-sm text-slate-500 dark:text-slate-400">Bëje tani që timelapse të mos ketë boshllëk.</span>
+                  <span className="block font-bold">Fotoja e sotme mungon</span>
+                  <span className="block text-sm text-slate-600 dark:text-slate-400">Bëje tani që videoja të mos ketë boshllëk.</span>
                 </span>
-                <Icon name="chevron" className="text-slate-400" />
               </button>
             )}
 
             {photos.length === 0 ? (
-              <div className="card border-dashed p-8 text-center mt-2">
-                <div className="h-16 w-16 mx-auto rounded-3xl bg-brand-50 dark:bg-brand-900/40 text-brand-600 dark:text-brand-300 flex items-center justify-center">
-                  <Icon name="image" size={30} />
-                </div>
-                <p className="font-bold mt-4">Ende s'ka foto këtu</p>
-                <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Bëj foton e parë ose ngarko nga galeria.</p>
-              </div>
+              <button onClick={() => setShowCamera(true)} className="w-full rounded-2xl border-2 border-dashed border-slate-400/70 dark:border-slate-700 p-8 text-center mt-2 active:scale-[0.99] transition">
+                <span className="mx-auto h-16 w-16 rounded-full bg-stamp-500 text-slate-950 shadow-glow flex items-center justify-center"><Icon name="camera" size={28} /></span>
+                <p className="font-display font-extrabold text-2xl mt-4">Dita 1</p>
+                <p className="text-slate-600 dark:text-slate-400 text-sm mt-1 max-w-[30ch] mx-auto">Bëj foton e parë. Zgjidh një kënd që mund ta gjesh lehtë edhe nesër.</p>
+              </button>
             ) : (
               groups.map(([day, items]) => (
                 <section key={day} className="mb-5">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2 capitalize">{day}</h4>
+                  <h4 className="flex items-baseline justify-between text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2"><span>{day}</span><span className="tnum font-normal">{items.length} foto</span></h4>
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
                     {items.map(p => (
                       <button key={p.id} onClick={() => setViewer(indexById[p.id])}
-                        className="relative aspect-square rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-800 active:scale-95 transition">
+                        aria-label={`Foto ${indexById[p.id] + 1}: ${fmtDay(photoDate(p))}, ora ${fmtTime(photoDate(p))}`}
+                        className="relative aspect-square rounded-[4px] overflow-hidden bg-slate-300 dark:bg-slate-800 active:scale-95 transition">
                         <Thumb filename={p.filename} />
-                        {p.source === 'capture' && (
-                          <span className="absolute bottom-1 right-1 h-5 w-5 rounded-full bg-black/50 text-white flex items-center justify-center"><Icon name="camera" size={12} /></span>
-                        )}
+                        <span className="absolute left-1.5 bottom-1 text-[11px] font-bold text-white tnum [text-shadow:0_1px_3px_rgba(0,0,0,0.8)]">{photoDate(p).getDate()} {MONTHS_SHORT[photoDate(p).getMonth()]}</span>
                       </button>
                     ))}
                   </div>
@@ -293,13 +304,12 @@ export default function LocationView() {
           <div>
             <form onSubmit={generate} className="card p-5 mb-5">
               <div className="flex items-center gap-2 mb-4">
-                <span className="h-9 w-9 rounded-xl bg-brand-gradient text-white flex items-center justify-center"><Icon name="film" size={18} /></span>
-                <h3 className="font-bold">Krijo Timelapse</h3>
+                <h3 className="font-display font-extrabold text-2xl leading-none">Krijo timelapse</h3>
               </div>
               <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1 mb-3">
                 {PRESETS.map(p => (
                   <button type="button" key={p.label} onClick={() => applyPreset(p.days)}
-                    className="chip shrink-0 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 active:scale-95">
+                    className="chip shrink-0 h-9 px-3 border border-slate-300 bg-slate-50 dark:bg-slate-800 dark:border-slate-700 text-slate-800 dark:text-slate-200 active:scale-95">
                     {p.label}
                   </button>
                 ))}
@@ -317,13 +327,13 @@ export default function LocationView() {
               <p className="text-xs text-slate-500 mt-2">{inRange} foto në këtë periudhë{inRange >= 2 ? ` · ~${Math.max(1, Math.round(inRange / 1.25))} sek video` : ''}</p>
               {genError && <p className="text-sm text-red-500 mt-2">{genError}</p>}
               <button disabled={generating || inRange < 2} className="btn-primary w-full mt-4">
-                {generating ? <><Spinner /> Duke filluar...</> : <><Icon name="sparkle" size={18} /> Gjenero Video</>}
+                {generating ? <><Spinner /> Duke filluar...</> : <><Icon name="film" size={18} /> Gjenero videon</>}
               </button>
             </form>
 
             <div className="flex flex-col gap-3">
               {timelapses.length === 0 && (
-                <p className="text-sm text-slate-500 text-center py-6">Ende s'ke gjeneruar asnjë timelapse.</p>
+                <p className="text-sm text-slate-500 text-center py-6">Videot që gjeneron shfaqen këtu.</p>
               )}
               {timelapses.map(t => (
                 <div key={t.id} className="card overflow-hidden">
@@ -341,12 +351,12 @@ export default function LocationView() {
                         </p>
                       </div>
                       {t.status === 'processing' && (
-                        <span className="text-sm font-bold text-brand-600 dark:text-brand-400 tabular-nums">{t.progress || 0}%</span>
+                        <span className="text-sm font-bold text-slate-700 dark:text-slate-300 tabular-nums">{t.progress || 0}%</span>
                       )}
                       {t.status === 'done' && (
                         <div className="flex gap-2 shrink-0">
-                          <button onClick={() => share(t)} aria-label="Ndaj" className="h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center active:scale-90"><Icon name="share" size={18} /></button>
-                          <a href={`/uploads/videos/${t.video_path}`} download className="h-10 px-4 rounded-full bg-brand-gradient text-white text-sm font-semibold flex items-center gap-1.5 active:scale-95">
+                          <button onClick={() => share(t)} aria-label="Ndaj" className="h-10 w-10 rounded-lg border border-slate-300 dark:border-slate-700 flex items-center justify-center active:scale-90"><Icon name="share" size={18} /></button>
+                          <a href={`/uploads/videos/${t.video_path}`} download className="h-10 px-4 rounded-lg bg-slate-900 text-slate-50 dark:bg-slate-50 dark:text-slate-900 text-sm font-semibold flex items-center gap-1.5 active:scale-95">
                             <Icon name="download" size={16} /> Shkarko
                           </a>
                         </div>
@@ -354,7 +364,7 @@ export default function LocationView() {
                     </div>
                     {t.status === 'processing' && (
                       <div className="mt-3 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                        <div className="h-full rounded-full bg-brand-gradient transition-all duration-500 ease-out" style={{ width: `${Math.max(4, t.progress || 0)}%` }} />
+                        <div className="h-full rounded-full bg-stamp-500 transition-all duration-500 ease-out" style={{ width: `${Math.max(4, t.progress || 0)}%` }} />
                       </div>
                     )}
                   </div>
@@ -367,10 +377,10 @@ export default function LocationView() {
 
       {/* Thumb-reach action bar */}
       {tab === 'foto' && (
-        <div className="fixed bottom-0 inset-x-0 z-30 safe-bottom bg-gradient-to-t from-slate-50 via-slate-50/95 to-transparent dark:from-ink-950 dark:via-ink-950/95">
+        <div className="fixed bottom-0 inset-x-0 z-30 safe-bottom bg-gradient-to-t from-[#e7e9e4] via-[#e7e9e4]/95 to-transparent dark:from-[#121614] dark:via-[#121614]/95">
           <div className="max-w-2xl mx-auto px-4 pt-6 pb-3 grid grid-cols-[1fr_auto] gap-3">
-            <button onClick={() => setShowCamera(true)} className="btn-primary h-14 text-base">
-              <Icon name="camera" /> Bëj Foto
+            <button onClick={() => setShowCamera(true)} className="btn-shutter h-14 text-base">
+              <Icon name="camera" /> Bëj foto
             </button>
             <button onClick={() => fileInputRef.current?.click()} disabled={!!uploading} className="btn-secondary h-14 px-5" aria-label="Ngarko nga galeria">
               <Icon name="upload" /> <span className="hidden min-[380px]:inline">Ngarko</span>

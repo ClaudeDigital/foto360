@@ -6,7 +6,7 @@ export default function Spinner({ className = '' }) {
 
 export function FullPageSpinner() {
   return (
-    <div className="min-h-screen flex items-center justify-center text-brand-500">
+    <div className="min-h-screen flex items-center justify-center text-slate-500">
       <Spinner className="h-8 w-8" />
     </div>
   );

@@ -46,7 +46,7 @@ export default function ForgotPassword() {
     }
   };
 
-  const footer = <>U kujtove? <Link to="/kycu" className="text-brand-600 dark:text-brand-400 font-semibold">Kyçu</Link></>;
+  const footer = <>U kujtove? <Link to="/kycu" className="text-slate-900 dark:text-slate-50 underline underline-offset-4 decoration-slate-400 dark:decoration-slate-500 font-semibold">Kyçu</Link></>;
 
   if (step === 'email') {
     return (
@@ -60,7 +60,7 @@ export default function ForgotPassword() {
           <button disabled={loading} className="btn-primary mt-2">
             {loading && <Spinner />} {loading ? 'Duke dërguar...' : 'Dërgo kodin'}
           </button>
-          <button type="button" onClick={() => { setInfo(''); setError(''); setStep('code'); }} className="text-sm font-semibold text-brand-600 dark:text-brand-400">
+          <button type="button" onClick={() => { setInfo(''); setError(''); setStep('code'); }} className="text-sm font-semibold text-slate-900 dark:text-slate-50 underline underline-offset-4 decoration-slate-400 dark:decoration-slate-500">
             Kam një kod nga administratori
           </button>
         </form>
@@ -71,7 +71,7 @@ export default function ForgotPassword() {
   return (
     <AuthLayout title="Fjalëkalim i ri" subtitle="Shkruaj kodin 6-shifror dhe fjalëkalimin e ri." footer={footer}>
       <form onSubmit={reset} className="flex flex-col gap-4">
-        {info && <p className="text-sm rounded-xl bg-brand-50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300 p-3">{info}</p>}
+        {info && <p className="text-sm rounded-xl bg-slate-300/50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-3">{info}</p>}
         <div>
           <label className="label" htmlFor="email2">Email</label>
           <input id="email2" type="email" autoComplete="email" inputMode="email" value={email} onChange={e => setEmail(e.target.value)} required className="input" />

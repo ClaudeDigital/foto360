@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Icon from './Icon.jsx';
 import Spinner from './Spinner.jsx';
+import DateStamp, { stampText } from './DateStamp.jsx';
 
 // Full-screen camera. `ghostSrc` (the previous photo) can be overlaid semi-transparently
 // so each day's shot lines up with the last one — that's what makes a timelapse smooth.
@@ -101,9 +102,14 @@ export default function CameraCapture({ onCapture, onClose, ghostSrc }) {
           </div>
         </div>
         {ghost && ghostSrc && ready && (
-          <p className="absolute bottom-4 inset-x-0 text-center text-xs text-white/85 px-6">
-            Përputh kadrin me foton e fundit për një timelapse të qetë.
+          <p className="absolute bottom-4 left-4 right-28 text-xs text-white/85">
+            Rreshto kadrin me foton e djeshme.
           </p>
+        )}
+        {ready && !error && (
+          <div className="absolute bottom-4 right-4 pointer-events-none">
+            <DateStamp value={stampText(new Date())} height={18} label="Data që do të ruhet me foton" />
+          </div>
         )}
       </div>
       <canvas ref={canvasRef} className="hidden" />
@@ -114,9 +120,9 @@ export default function CameraCapture({ onCapture, onClose, ghostSrc }) {
             disabled={!ready || busy}
             onClick={capture}
             aria-label="Bëj foto"
-            className="h-[76px] w-[76px] rounded-full border-4 border-white/85 p-1.5 disabled:opacity-50 active:scale-90 transition"
+            className="h-[78px] w-[78px] rounded-full border-[3px] border-white p-[5px] disabled:opacity-50 active:scale-90 transition"
           >
-            <span className="h-full w-full rounded-full bg-white flex items-center justify-center text-slate-900">
+            <span className="h-full w-full rounded-full bg-stamp-500 flex items-center justify-center text-slate-950">
               {busy && <Spinner className="h-6 w-6" />}
             </span>
           </button>

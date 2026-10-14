@@ -10,17 +10,16 @@ const ITEMS = [
 
 export default function BottomNav() {
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-30 safe-bottom backdrop-blur-xl bg-white/85 dark:bg-ink-950/85 border-t border-slate-200/70 dark:border-slate-800/70">
+    <nav className="fixed bottom-0 inset-x-0 z-30 safe-bottom backdrop-blur-xl bg-[#e7e9e4]/90 dark:bg-[#121614]/90 border-t border-slate-300/70 dark:border-slate-800">
       <div className="max-w-2xl mx-auto grid grid-cols-3 h-16">
         {ITEMS.map(it => (
           <NavLink key={it.to} to={it.to} className={({ isActive }) =>
-            `flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition ${isActive ? 'text-brand-600 dark:text-brand-400' : 'text-slate-500 dark:text-slate-400'}`
+            `relative flex flex-col items-center justify-center gap-1 text-[11px] font-semibold transition ${isActive ? 'text-slate-900 dark:text-slate-50' : 'text-slate-500 dark:text-slate-400'}`
           }>
             {({ isActive }) => (
               <>
-                <span className={`flex items-center justify-center h-8 w-14 rounded-full transition ${isActive ? 'bg-brand-100 dark:bg-brand-900/50' : ''}`}>
-                  <Icon name={it.icon} size={21} strokeWidth={isActive ? 2.2 : 1.9} />
-                </span>
+                {isActive && <span className="absolute top-0 h-[3px] w-10 rounded-b bg-slate-900 dark:bg-slate-50" />}
+                <Icon name={it.icon} size={22} strokeWidth={isActive ? 2.2 : 1.8} />
                 {it.label}
               </>
             )}

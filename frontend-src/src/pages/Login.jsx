@@ -32,7 +32,7 @@ export default function Login() {
     <AuthLayout
       title="Mirë se u ktheve"
       subtitle="Kyçu për të vazhduar dokumentimin."
-      footer={<>S’ke llogari? <Link to="/regjistrohu" className="text-brand-600 dark:text-brand-400 font-semibold">Regjistrohu</Link></>}
+      footer={<>S’ke llogari? <Link to="/regjistrohu" className="text-slate-900 dark:text-slate-50 underline underline-offset-4 decoration-slate-400 dark:decoration-slate-500 font-semibold">Regjistrohu</Link></>}
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
         <div>
@@ -42,7 +42,7 @@ export default function Login() {
         <div>
           <div className="flex items-center justify-between">
             <label className="label" htmlFor="password">Fjalëkalimi</label>
-            <Link to="/harrova" className="text-xs font-semibold text-brand-600 dark:text-brand-400 mb-1.5">Harrove fjalëkalimin?</Link>
+            <Link to="/harrova" className="text-xs font-semibold text-slate-900 dark:text-slate-50 underline underline-offset-4 decoration-slate-400 dark:decoration-slate-500 mb-1.5">Harrove fjalëkalimin?</Link>
           </div>
           <input id="password" type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required className="input" />
         </div>

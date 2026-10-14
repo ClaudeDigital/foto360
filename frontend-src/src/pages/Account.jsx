@@ -9,7 +9,7 @@ import InstallApp from '../components/InstallApp.jsx';
 import ReminderToggle from '../components/ReminderToggle.jsx';
 import ChangePasswordSheet from '../components/ChangePasswordSheet.jsx';
 import { TIER_LABEL } from './Dashboard.jsx';
-import { parseDbDate } from '../utils.js';
+import { fmtShort, parseDbDate } from '../utils.js';
 
 const STATUS = {
   pending: ['Në pritje', 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'],
@@ -34,7 +34,7 @@ export default function Account() {
       <TopBar title="Llogaria" theme={false} />
       <div className="max-w-lg mx-auto px-4 pt-5 flex flex-col gap-5">
         <div className="card p-5 flex items-center gap-4">
-          <div className="h-16 w-16 rounded-full bg-brand-gradient text-white text-xl font-bold flex items-center justify-center shadow-glow">{initials}</div>
+          <div className="h-16 w-16 rounded-full bg-slate-900 text-slate-50 dark:bg-slate-50 dark:text-slate-900 font-display text-2xl font-extrabold flex items-center justify-center">{initials}</div>
           <div className="min-w-0">
             <p className="font-bold text-lg truncate">{user?.name}</p>
             <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{user?.email}</p>
@@ -74,7 +74,7 @@ export default function Account() {
                 <div key={o.id} className="p-4 flex items-center justify-between gap-3">
                   <div>
                     <p className="font-medium text-sm">{o.plan === 'full' ? 'Full Access' : 'Limited Access'} · €{o.amount}</p>
-                    <p className="text-xs text-slate-500">{parseDbDate(o.created_at)?.toLocaleDateString('sq-AL')} · {o.payment_method === 'cash' ? 'Cash' : 'Kartë'}</p>
+                    <p className="text-xs text-slate-500">{fmtShort(parseDbDate(o.created_at))} · {o.payment_method === 'cash' ? 'Cash' : 'Kartë'}</p>
                   </div>
                   <span className={`chip ${STATUS[o.status]?.[1] || ''}`}>{STATUS[o.status]?.[0] || o.status}</span>
                 </div>
@@ -87,7 +87,7 @@ export default function Account() {
           <Icon name="logout" size={20} /> Dil nga llogaria
         </button>
         <ChangePasswordSheet open={pwOpen} onClose={() => setPwOpen(false)} save={api.changePassword} />
-        <p className="text-center text-xs text-slate-400 pb-2">foto360 · v1.2</p>
+        <p className="text-center text-xs text-slate-400 pb-2">foto360 v1.3</p>
       </div>
     </div>
   );

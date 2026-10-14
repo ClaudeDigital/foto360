@@ -8,7 +8,7 @@ export default function ThemeToggle({ className = '' }) {
     <button
       onClick={toggle}
       aria-label="Ndrysho temën"
-      className={`h-10 w-10 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 active:scale-90 transition ${className}`}
+      className={`h-10 w-10 flex items-center justify-center rounded-lg hover:bg-slate-300/50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 active:scale-90 transition ${className}`}
     >
       <Icon name={dark ? 'sun' : 'moon'} size={18} />
     </button>

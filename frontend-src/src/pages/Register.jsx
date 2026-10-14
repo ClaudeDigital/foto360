@@ -33,7 +33,7 @@ export default function Register() {
     <AuthLayout
       title="Krijo llogari"
       subtitle="Regjistrimi zgjat më pak se një minutë."
-      footer={<>Ke llogari? <Link to="/kycu" className="text-brand-600 dark:text-brand-400 font-semibold">Kyçu</Link></>}
+      footer={<>Ke llogari? <Link to="/kycu" className="text-slate-900 dark:text-slate-50 underline underline-offset-4 decoration-slate-400 dark:decoration-slate-500 font-semibold">Kyçu</Link></>}
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
         <div>

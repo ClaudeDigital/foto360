@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Icon from './Icon.jsx';
 import { photoUrl } from '../api.js';
-import { photoDate } from '../utils.js';
+import { fmtDate, fmtTime, photoDate } from '../utils.js';
+import DateStamp, { stampText } from './DateStamp.jsx';
 
 // Full-screen photo viewer with swipe / arrow-key navigation.
 export default function Lightbox({ photos, index, onIndex, onClose, onDelete }) {
@@ -39,14 +40,17 @@ export default function Lightbox({ photos, index, onIndex, onClose, onDelete }) 
       <div className="flex items-center justify-between p-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white">
         <button onClick={onClose} aria-label="Mbyll" className="h-11 w-11 rounded-full bg-white/10 flex items-center justify-center active:scale-95"><Icon name="close" /></button>
         <div className="text-center">
-          <p className="text-sm font-semibold">{d.toLocaleDateString('sq-AL', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-          <p className="text-xs text-white/60">{d.toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit' })} · {index + 1}/{photos.length}</p>
+          <p className="text-sm font-semibold">{fmtDate(d)}, ora {fmtTime(d)}</p>
+          <p className="text-xs text-white/60 tnum">Foto {index + 1} nga {photos.length}</p>
         </div>
         <a href={photoUrl(photo.filename)} download aria-label="Shkarko" className="h-11 w-11 rounded-full bg-white/10 flex items-center justify-center active:scale-95"><Icon name="download" /></a>
       </div>
 
       <div className="relative flex-1 flex items-center justify-center overflow-hidden">
-        <img key={photo.id} src={photoUrl(photo.filename)} alt="" className="max-h-full max-w-full object-contain animate-fade-in select-none" draggable={false} />
+        <div className="relative max-h-full max-w-full">
+          <img key={photo.id} src={photoUrl(photo.filename)} alt="" className="block max-h-[calc(100dvh-10rem)] max-w-full object-contain animate-fade-in select-none" draggable={false} />
+          <div className="absolute right-3 bottom-3 pointer-events-none"><DateStamp value={stampText(d)} height={18} /></div>
+        </div>
         {index > 0 && (
           <button onClick={() => onIndex(index - 1)} aria-label="E mëparshmja" className="hidden sm:flex absolute left-3 h-11 w-11 rounded-full bg-white/10 text-white items-center justify-center"><Icon name="back" /></button>
         )}

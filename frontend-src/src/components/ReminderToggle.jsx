@@ -60,7 +60,7 @@ export default function ReminderToggle() {
         )}
       </button>
       {on && (
-        <button onClick={test} className="w-full flex items-center gap-3 p-4 text-left text-sm text-brand-600 dark:text-brand-400 font-medium">
+        <button onClick={test} className="w-full flex items-center gap-3 p-4 text-left text-sm text-slate-900 dark:text-slate-50 underline underline-offset-4 decoration-slate-400 dark:decoration-slate-500 font-medium">
           <Icon name="sparkle" size={18} /> Dërgo një njoftim provë
         </button>
       )}

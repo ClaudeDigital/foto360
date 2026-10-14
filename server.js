@@ -473,7 +473,9 @@ app.get('/api/locations', auth, (req, res) => {
   const locations = db.prepare(`
     SELECT l.*,
       (SELECT COUNT(*) FROM photos p WHERE p.location_id=l.id) as photo_count,
-      (SELECT MAX(COALESCE(p.captured_at, p.created_at)) FROM photos p WHERE p.location_id=l.id) as last_photo_at
+      (SELECT MAX(datetime(COALESCE(p.captured_at, p.created_at))) FROM photos p WHERE p.location_id=l.id) as last_photo_at,
+      (SELECT p.filename FROM photos p WHERE p.location_id=l.id
+        ORDER BY datetime(COALESCE(p.captured_at, p.created_at)) DESC, p.id DESC LIMIT 1) as latest_photo
     FROM locations l WHERE l.user_id=? ORDER BY l.id DESC
   `).all(req.userId);
   res.json({ locations });
