@@ -40,7 +40,10 @@ export default function Login() {
           <input id="email" type="email" autoComplete="email" inputMode="email" value={email} onChange={e => setEmail(e.target.value)} required className="input" />
         </div>
         <div>
-          <label className="label" htmlFor="password">Fjalëkalimi</label>
+          <div className="flex items-center justify-between">
+            <label className="label" htmlFor="password">Fjalëkalimi</label>
+            <Link to="/harrova" className="text-xs font-semibold text-brand-600 dark:text-brand-400 mb-1.5">Harrove fjalëkalimin?</Link>
+          </div>
           <input id="password" type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required className="input" />
         </div>
         {error && <p className="text-sm text-red-500">{error}</p>}

@@ -26,6 +26,9 @@ export const api = {
   register: (body) => request('/auth/register', { method: 'POST', body }),
   login: (body) => request('/auth/login', { method: 'POST', body }),
   me: () => request('/auth/me'),
+  forgot: (body) => request('/auth/forgot', { method: 'POST', body }),
+  resetPassword: (body) => request('/auth/reset', { method: 'POST', body }),
+  changePassword: (body) => request('/auth/change-password', { method: 'POST', body }),
   createOrder: (body) => request('/orders', { method: 'POST', body }),
   myOrders: () => request('/orders/mine'),
   locations: () => request('/locations'),
@@ -47,6 +50,8 @@ export const api = {
   adminMe: () => request('/admin/me', { admin: true }),
   adminStats: () => request('/admin/stats', { admin: true }),
   adminUsers: () => request('/admin/users', { admin: true }),
+  adminResetCode: (id) => request(`/admin/users/${id}/reset-code`, { method: 'POST', admin: true }),
+  adminChangePassword: (body) => request('/admin/change-password', { method: 'POST', body, admin: true }),
   adminOrders: (status) => request(`/admin/orders${status ? `?status=${status}` : ''}`, { admin: true }),
   adminDecide: (id, decision) => request(`/admin/orders/${id}`, { method: 'PUT', body: { decision }, admin: true })
 };

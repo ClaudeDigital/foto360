@@ -263,6 +263,116 @@ app.get('/api/auth/me', auth, (req, res) => {
   res.json({ user: getUser(req.userId) });
 });
 
+// ---------- Password change / reset ----------
+// Two ways to reset a forgotten password, both ending in the same 6-digit code form:
+//  - the user asks for a code by email (sent through Resend), valid 30 minutes;
+//  - the admin generates a code in /admin and passes it on (phone, chat), valid 24 hours.
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const MAIL_FROM = process.env.MAIL_FROM || 'foto360 <foto360@cmimet.gezimm.com>';
+const RESET_MAX_ATTEMPTS = 5;
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS password_resets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  code_hash TEXT NOT NULL,
+  source TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+`);
+
+const hashCode = (code) => crypto.createHash('sha256').update(`${JWT_SECRET}:${code}`).digest('hex');
+const sqlTime = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
+
+function createResetCode(userId, source, ttlMinutes) {
+  const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  // A new code replaces any earlier unused one.
+  db.prepare("UPDATE password_resets SET used_at=datetime('now') WHERE user_id=? AND used_at IS NULL").run(userId);
+  db.prepare('INSERT INTO password_resets (user_id, code_hash, source, expires_at) VALUES (?, ?, ?, ?)')
+    .run(userId, hashCode(code), source, sqlTime(new Date(Date.now() + ttlMinutes * 60000)));
+  return code;
+}
+
+async function sendResetEmail(user, code) {
+  if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY mungon');
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: MAIL_FROM,
+      to: [user.email],
+      subject: `Kodi yt foto360: ${code}`,
+      text: `Përshëndetje ${user.name},\n\nKodi për të ndryshuar fjalëkalimin në foto360 është: ${code}\n\nKodi vlen 30 minuta. Hape ${PUBLIC_URL}/harrova dhe shkruaje aty.\n\nNëse nuk e ke kërkuar ti, injoroje këtë email.`
+    })
+  });
+  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
+}
+
+app.post('/api/auth/forgot', async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const generic = { ok: true, message: 'Nëse ky email ka llogari, kodi u dërgua.' };
+  const user = email && db.prepare('SELECT id, name, email FROM users WHERE email=?').get(email);
+  if (!user) return res.json(generic);
+  const recent = db.prepare("SELECT COUNT(*) c FROM password_resets WHERE user_id=? AND source='email' AND created_at >= datetime('now','-1 hour')").get(user.id).c;
+  if (recent >= 3) return res.status(429).json({ error: 'Ke kërkuar shumë kode. Provo pas një ore.' });
+  const code = createResetCode(user.id, 'email', 30);
+  try {
+    await sendResetEmail(user, code);
+  } catch (e) {
+    console.error('reset email failed', e.message);
+    return res.status(502).json({ error: 'Emaili nuk u dërgua. Provo më vonë ose kontakto administratorin.' });
+  }
+  res.json(generic);
+});
+
+app.post('/api/auth/reset', (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const code = String(req.body?.code || '').replace(/\D/g, '');
+  const password = String(req.body?.password || '');
+  if (password.length < 6) return res.status(400).json({ error: 'Fjalëkalimi duhet të ketë të paktën 6 karaktere' });
+  const invalid = () => res.status(400).json({ error: 'Kodi është i gabuar ose ka skaduar' });
+  const user = db.prepare('SELECT id FROM users WHERE email=?').get(email);
+  if (!user) return invalid();
+  const reset = db.prepare("SELECT * FROM password_resets WHERE user_id=? AND used_at IS NULL AND expires_at > datetime('now') ORDER BY id DESC LIMIT 1").get(user.id);
+  if (!reset || reset.attempts >= RESET_MAX_ATTEMPTS) return invalid();
+  if (reset.code_hash !== hashCode(code)) {
+    db.prepare('UPDATE password_resets SET attempts=attempts+1 WHERE id=?').run(reset.id);
+    return invalid();
+  }
+  db.prepare("UPDATE password_resets SET used_at=datetime('now') WHERE id=?").run(reset.id);
+  db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(bcrypt.hashSync(password, 10), user.id);
+  const token = signToken({ id: user.id, role: 'user' });
+  res.json({ token, user: getUser(user.id) });
+});
+
+app.post('/api/auth/change-password', auth, (req, res) => {
+  const { current, password } = req.body || {};
+  const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.userId);
+  if (!user || !bcrypt.compareSync(current || '', user.password_hash)) return res.status(400).json({ error: 'Fjalëkalimi aktual është i gabuar' });
+  if (!password || password.length < 6) return res.status(400).json({ error: 'Fjalëkalimi i ri duhet të ketë të paktën 6 karaktere' });
+  db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(bcrypt.hashSync(password, 10), user.id);
+  res.json({ ok: true });
+});
+
+app.post('/api/admin/users/:id/reset-code', adminAuth, (req, res) => {
+  const user = db.prepare('SELECT id, name, email FROM users WHERE id=?').get(req.params.id);
+  if (!user) return res.status(404).json({ error: 'Nuk u gjet' });
+  res.json({ code: createResetCode(user.id, 'admin', 24 * 60), hours: 24, email: user.email });
+});
+
+app.post('/api/admin/change-password', adminAuth, (req, res) => {
+  const { current, password } = req.body || {};
+  const admin = db.prepare('SELECT * FROM admin_users WHERE id=?').get(req.adminId);
+  if (!admin || !bcrypt.compareSync(current || '', admin.password_hash)) return res.status(400).json({ error: 'Fjalëkalimi aktual është i gabuar' });
+  if (!password || password.length < 8) return res.status(400).json({ error: 'Fjalëkalimi i ri duhet të ketë të paktën 8 karaktere' });
+  db.prepare('UPDATE admin_users SET password_hash=? WHERE id=?').run(bcrypt.hashSync(password, 10), admin.id);
+  res.json({ ok: true });
+});
+
 // ---------- Orders / Payment ----------
 const PLAN_PRICES = { full: 10, limited: 1 };
 

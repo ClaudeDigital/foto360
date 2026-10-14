@@ -7,6 +7,7 @@ import TopBar from '../components/TopBar.jsx';
 import Icon from '../components/Icon.jsx';
 import InstallApp from '../components/InstallApp.jsx';
 import ReminderToggle from '../components/ReminderToggle.jsx';
+import ChangePasswordSheet from '../components/ChangePasswordSheet.jsx';
 import { TIER_LABEL } from './Dashboard.jsx';
 import { parseDbDate } from '../utils.js';
 
@@ -21,6 +22,7 @@ export default function Account() {
   const { dark, toggle } = useTheme();
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
+  const [pwOpen, setPwOpen] = useState(false);
 
   useEffect(() => { api.myOrders().then(r => setOrders(r.orders)).catch(() => {}); }, []);
 
@@ -52,6 +54,11 @@ export default function Account() {
               <span className={`block h-6 w-6 rounded-full bg-white shadow transition ${dark ? 'translate-x-5' : ''}`} />
             </span>
           </button>
+          <button onClick={() => setPwOpen(true)} className="w-full flex items-center gap-3 p-4 text-left">
+            <Icon name="shield" className="text-slate-500" />
+            <span className="flex-1 font-medium">Ndrysho fjalëkalimin</span>
+            <Icon name="chevron" className="text-slate-400" />
+          </button>
           <button onClick={() => navigate('/planet')} className="w-full flex items-center gap-3 p-4 text-left">
             <Icon name="sparkle" className="text-slate-500" />
             <span className="flex-1 font-medium">Plani & pagesa</span>
@@ -79,6 +86,7 @@ export default function Account() {
         <button onClick={() => { logout(); navigate('/', { replace: true }); }} className="btn w-full text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40">
           <Icon name="logout" size={20} /> Dil nga llogaria
         </button>
+        <ChangePasswordSheet open={pwOpen} onClose={() => setPwOpen(false)} save={api.changePassword} />
         <p className="text-center text-xs text-slate-400 pb-2">foto360 · v1.2</p>
       </div>
     </div>

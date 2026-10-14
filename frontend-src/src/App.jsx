@@ -9,6 +9,7 @@ import BottomNav from './components/BottomNav.jsx';
 import Landing from './pages/Landing.jsx';
 import Register from './pages/Register.jsx';
 import Login from './pages/Login.jsx';
+import ForgotPassword from './pages/ForgotPassword.jsx';
 import Pricing from './pages/Pricing.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import LocationView from './pages/LocationView.jsx';
@@ -37,6 +38,7 @@ export default function App() {
               <Route path="/" element={<Landing />} />
               <Route path="/regjistrohu" element={<Register />} />
               <Route path="/kycu" element={<Login />} />
+              <Route path="/harrova" element={<ForgotPassword />} />
               <Route element={<UserLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/planet" element={<Pricing />} />

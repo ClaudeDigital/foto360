@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import TopBar from '../components/TopBar.jsx';
+import Sheet from '../components/Sheet.jsx';
+import ChangePasswordSheet from '../components/ChangePasswordSheet.jsx';
 import { FullPageSpinner } from '../components/Spinner.jsx';
 
 const TIER_LABEL = { none: 'Pa plan', limited: 'Limited', full: 'Full' };
@@ -15,6 +17,18 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [orderFilter, setOrderFilter] = useState('pending');
   const [busyId, setBusyId] = useState(null);
+  const [pwOpen, setPwOpen] = useState(false);
+  const [resetInfo, setResetInfo] = useState(null); // { name, email, code, hours }
+
+  const makeCode = async (u) => {
+    if (!window.confirm(`Gjenero kod të ri për fjalëkalimin e ${u.name}?`)) return;
+    try {
+      const r = await api.adminResetCode(u.id);
+      setResetInfo({ name: u.name, ...r });
+    } catch (e) {
+      window.alert(e.message);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -61,9 +75,14 @@ export default function AdminDashboard() {
       <TopBar
         title="Admin — foto360"
         right={
-          <button onClick={() => { localStorage.removeItem('foto360_admin_token'); navigate('/admin'); }} className="text-xs font-medium text-slate-500 dark:text-slate-400 px-2">
-            Dil
-          </button>
+          <div className="flex items-center">
+            <button onClick={() => setPwOpen(true)} className="text-xs font-medium text-slate-500 dark:text-slate-400 px-2">
+              Fjalëkalimi
+            </button>
+            <button onClick={() => { localStorage.removeItem('foto360_admin_token'); navigate('/admin'); }} className="text-xs font-medium text-slate-500 dark:text-slate-400 px-2">
+              Dil
+            </button>
+          </div>
         }
       />
       <div className="max-w-2xl mx-auto px-4 pt-4 pb-16 safe-bottom">
@@ -155,14 +174,30 @@ export default function AdminDashboard() {
                   <p className="text-xs text-slate-500">{u.email}</p>
                   <p className="text-xs text-slate-500 mt-0.5">{u.location_count} lokacione</p>
                 </div>
-                <span className="text-[11px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800">
-                  {TIER_LABEL[u.access_tier]}
-                </span>
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  <span className="text-[11px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800">
+                    {TIER_LABEL[u.access_tier]}
+                  </span>
+                  <button onClick={() => makeCode(u)} className="text-xs font-semibold text-brand-600 dark:text-brand-400">
+                    Kod fjalëkalimi
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
+      <ChangePasswordSheet open={pwOpen} onClose={() => setPwOpen(false)} save={api.adminChangePassword} minLength={8} />
+      <Sheet open={!!resetInfo} onClose={() => setResetInfo(null)} title="Kodi për fjalëkalimin">
+        {resetInfo && (
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-slate-600 dark:text-slate-300">Jepja këtë kod <b>{resetInfo.name}</b> ({resetInfo.email}). Vlen {resetInfo.hours} orë dhe përdoret një herë.</p>
+            <p className="text-4xl font-extrabold tracking-[0.3em] text-center select-all">{resetInfo.code}</p>
+            <p className="text-xs text-slate-500">Klienti hap foto360 → Kyçu → “Harrove fjalëkalimin?” → “Kam një kod nga administratori”.</p>
+            <button onClick={() => navigator.clipboard?.writeText(resetInfo.code)} className="btn-primary">Kopjo kodin</button>
+          </div>
+        )}
+      </Sheet>
     </div>
   );
 }
