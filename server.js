@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const cors = require('cors');
+const compression = require('compression');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
@@ -21,7 +22,8 @@ const PUBLIC_URL = process.env.PUBLIC_URL || 'https://foto360.gezimm.com';
 const DATA_DIR = path.join(__dirname, 'data');
 const UPLOAD_PHOTOS = path.join(__dirname, 'uploads', 'photos');
 const UPLOAD_VIDEOS = path.join(__dirname, 'uploads', 'videos');
-[DATA_DIR, UPLOAD_PHOTOS, UPLOAD_VIDEOS].forEach(d => fs.mkdirSync(d, { recursive: true }));
+const UPLOAD_THUMBS = path.join(__dirname, 'uploads', 'thumbs');
+[DATA_DIR, UPLOAD_PHOTOS, UPLOAD_VIDEOS, UPLOAD_THUMBS].forEach(d => fs.mkdirSync(d, { recursive: true }));
 
 const db = new Database(path.join(DATA_DIR, 'foto360.db'));
 db.pragma('journal_mode = WAL');
@@ -94,9 +96,54 @@ if (db.prepare('SELECT COUNT(*) c FROM admin_users').get().c === 0) {
     .run('admin', bcrypt.hashSync('admin123', 10));
 }
 
+app.disable('x-powered-by');
 app.use(cors());
+app.use(compression());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+// ---------- Thumbnails ----------
+// Gallery grids on phones only need ~480px images; serving the original 3–8 MB camera
+// JPEGs made the photo grid slow on mobile data. Thumbnails are generated lazily with
+// ffmpeg on first request (so existing photos get them too) and cached on disk.
+const SAFE_FILENAME = /^[\w.-]+$/;
+const thumbJobs = new Map();
+function ensureThumb(filename) {
+  const dst = path.join(UPLOAD_THUMBS, filename);
+  if (fs.existsSync(dst)) return Promise.resolve(dst);
+  if (!thumbJobs.has(filename)) {
+    const src = path.join(UPLOAD_PHOTOS, filename);
+    const tmp = path.join(UPLOAD_THUMBS, `tmp-${crypto.randomBytes(4).toString('hex')}-${filename}`);
+    const job = run('ffmpeg', ['-y', '-loglevel', 'error', '-i', src, '-vf', "scale='min(480,iw)':-2", '-frames:v', '1', '-q:v', '5', '-f', 'image2', tmp])
+      .then(() => { fs.renameSync(tmp, dst); return dst; })
+      .catch((e) => { fs.rm(tmp, { force: true }, () => {}); throw e; })
+      .finally(() => thumbJobs.delete(filename));
+    thumbJobs.set(filename, job);
+  }
+  return thumbJobs.get(filename);
+}
+function removePhotoFiles(filename) {
+  fs.unlink(path.join(UPLOAD_PHOTOS, filename), () => {});
+  fs.unlink(path.join(UPLOAD_THUMBS, filename), () => {});
+}
+
+app.get('/uploads/thumbs/:file', async (req, res) => {
+  const { file } = req.params;
+  if (!SAFE_FILENAME.test(file) || !fs.existsSync(path.join(UPLOAD_PHOTOS, file))) return res.sendStatus(404);
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  try {
+    res.sendFile(await ensureThumb(file));
+  } catch (e) {
+    // Fall back to the original if ffmpeg can't decode it (e.g. HEIC on older ffmpeg).
+    res.sendFile(path.join(UPLOAD_PHOTOS, file));
+  }
+});
+// Photo/video filenames are unique (timestamp + random), so they can be cached forever.
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { maxAge: '365d', immutable: true }));
 
 // ---------- Auth helpers ----------
 function signToken(payload) {
@@ -313,7 +360,9 @@ function locationLimitReached(user) {
 
 app.get('/api/locations', auth, (req, res) => {
   const locations = db.prepare(`
-    SELECT l.*, (SELECT COUNT(*) FROM photos p WHERE p.location_id=l.id) as photo_count
+    SELECT l.*,
+      (SELECT COUNT(*) FROM photos p WHERE p.location_id=l.id) as photo_count,
+      (SELECT MAX(COALESCE(p.captured_at, p.created_at)) FROM photos p WHERE p.location_id=l.id) as last_photo_at
     FROM locations l WHERE l.user_id=? ORDER BY l.id DESC
   `).all(req.userId);
   res.json({ locations });
@@ -345,7 +394,7 @@ app.delete('/api/locations/:id', auth, (req, res) => {
   const loc = ownsLocation(req.params.id, req.userId);
   if (!loc) return res.status(404).json({ error: 'Nuk u gjet' });
   const photos = db.prepare('SELECT filename FROM photos WHERE location_id=?').all(loc.id);
-  photos.forEach(p => fs.unlink(path.join(UPLOAD_PHOTOS, p.filename), () => {}));
+  photos.forEach(p => removePhotoFiles(p.filename));
   db.prepare('DELETE FROM photos WHERE location_id=?').run(loc.id);
   db.prepare('DELETE FROM timelapses WHERE location_id=?').run(loc.id);
   db.prepare('DELETE FROM locations WHERE id=?').run(loc.id);
@@ -360,12 +409,16 @@ const storage = multer.diskStorage({
     cb(null, `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`);
   }
 });
-const upload = multer({ storage, limits: { fileSize: 15 * 1024 * 1024 } });
+const upload = multer({
+  storage,
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, /^image\//.test(file.mimetype))
+});
 
 app.post('/api/locations/:id/photos', auth, upload.single('photo'), (req, res) => {
   const loc = ownsLocation(req.params.id, req.userId);
   if (!loc) return res.status(404).json({ error: 'Nuk u gjet' });
-  if (!req.file) return res.status(400).json({ error: 'Foto mungon' });
+  if (!req.file) return res.status(400).json({ error: 'Foto mungon ose formati nuk është imazh' });
   const source = req.body.source === 'capture' ? 'capture' : 'upload';
   let capturedAt = null;
   if (source === 'capture') {
@@ -399,8 +452,13 @@ app.delete('/api/photos/:id', auth, (req, res) => {
   if (!photo) return res.status(404).json({ error: 'Nuk u gjet' });
   const loc = ownsLocation(photo.location_id, req.userId);
   if (!loc) return res.status(403).json({ error: 'Ndaluar' });
-  fs.unlink(path.join(UPLOAD_PHOTOS, photo.filename), () => {});
+  removePhotoFiles(photo.filename);
   db.prepare('DELETE FROM photos WHERE id=?').run(photo.id);
+  if (loc.cover_photo === photo.filename) {
+    // Don't leave the dashboard card pointing at a deleted file.
+    const next = db.prepare('SELECT filename FROM photos WHERE location_id=? ORDER BY COALESCE(captured_at, created_at) DESC, id DESC LIMIT 1').get(loc.id);
+    db.prepare('UPDATE locations SET cover_photo=? WHERE id=?').run(next ? next.filename : null, loc.id);
+  }
   res.json({ ok: true });
 });
 
@@ -567,8 +625,23 @@ app.put('/api/admin/orders/:id', adminAuth, (req, res) => {
 // ---------- Static frontend ----------
 const FRONTEND_DIR = path.join(__dirname, 'frontend');
 if (fs.existsSync(FRONTEND_DIR)) {
-  app.use(express.static(FRONTEND_DIR));
+  express.static.mime.define({ 'application/manifest+json': ['webmanifest'] });
+  app.use(express.static(FRONTEND_DIR, {
+    setHeaders: (res, filePath) => {
+      const rel = path.relative(FRONTEND_DIR, filePath);
+      if (rel.startsWith('assets' + path.sep)) {
+        // Vite fingerprints these, so they never change under the same name.
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else if (/^(sw\.js|index\.html|manifest\.webmanifest)$/.test(rel)) {
+        // Must revalidate so new deploys (and new service workers) reach installed apps.
+        res.setHeader('Cache-Control', 'no-cache');
+      } else {
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+      }
+    }
+  }));
   app.get(/^(?!\/api|\/uploads).*/, (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
   });
 }

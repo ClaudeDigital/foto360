@@ -1,27 +1,78 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root {
-  height: 100%;
+@layer base {
+  html, body, #root { min-height: 100%; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased dark:bg-ink-950 dark:text-slate-100;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+  /* iOS zooms into inputs below 16px — keep form fields at 16px on phones. */
+  input, select, textarea { font-size: 16px; }
+  @media (min-width: 640px) { input, select, textarea { font-size: 15px; } }
+  button { -webkit-user-select: none; user-select: none; }
 }
 
-body {
-  font-family: 'Inter', system-ui, sans-serif;
-  -webkit-tap-highlight-color: transparent;
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 h-12 px-5 rounded-2xl font-semibold transition
+           active:scale-[0.97] disabled:opacity-60 disabled:active:scale-100 select-none;
+  }
+  .btn-primary { @apply btn bg-brand-gradient text-white shadow-glow; }
+  .btn-secondary {
+    @apply btn bg-white text-slate-800 border border-slate-200 shadow-sm
+           dark:bg-slate-800/70 dark:text-slate-100 dark:border-slate-700;
+  }
+  .btn-ghost { @apply btn bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800; }
+  .btn-danger { @apply btn bg-red-600 text-white hover:bg-red-700; }
+
+  .input {
+    @apply w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 outline-none transition
+           placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15
+           dark:border-slate-700 dark:bg-slate-900 dark:placeholder:text-slate-500;
+  }
+  .label { @apply block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5; }
+
+  .card {
+    @apply rounded-3xl bg-white border border-slate-200/80 shadow-soft
+           dark:bg-slate-900/80 dark:border-slate-800;
+  }
+  .chip { @apply inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full; }
+
+  .segmented { @apply flex gap-1 p-1 rounded-2xl bg-slate-200/60 dark:bg-slate-800/70; }
+  .segmented > button {
+    @apply flex-1 h-10 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-400 transition;
+  }
+  .segmented > button[aria-selected='true'] {
+    @apply bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white;
+  }
+
+  .skeleton {
+    @apply bg-slate-200 dark:bg-slate-800;
+    background-image: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
+  .dark .skeleton { background-image: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%); }
+
+  .spinner { @apply h-5 w-5 rounded-full border-2 border-current border-t-transparent animate-spin; }
 }
 
-.safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
+@layer utilities {
+  .safe-top { padding-top: env(safe-area-inset-top); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  .pb-nav { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
+  .bottom-nav-offset { bottom: calc(5rem + env(safe-area-inset-bottom)); }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; }
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
 }
-::-webkit-scrollbar-thumb {
-  background: rgba(128,128,128,0.4);
-  border-radius: 3px;
-}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.4); border-radius: 3px; }

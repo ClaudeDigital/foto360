@@ -1,25 +1,30 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle.jsx';
+import Icon from './Icon.jsx';
 
-export default function TopBar({ title, back, right }) {
+export default function TopBar({ title, subtitle, back, right, theme = true }) {
   const navigate = useNavigate();
+  const goBack = () => (window.history.length > 1 ? navigate(-1) : navigate(typeof back === 'string' ? back : '/'));
   return (
-    <div className="sticky top-0 z-20 backdrop-blur bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800">
-      <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
+    <header className="sticky top-0 z-30 safe-top backdrop-blur-xl bg-slate-50/80 dark:bg-ink-950/80 border-b border-slate-200/70 dark:border-slate-800/70">
+      <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1 min-w-0">
           {back && (
-            <button onClick={() => navigate(-1)} className="h-9 w-9 -ml-1 flex items-center justify-center rounded-full text-slate-600 dark:text-slate-300 active:scale-95 shrink-0">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+            <button onClick={goBack} aria-label="Kthehu" className="h-10 w-10 -ml-2 flex items-center justify-center rounded-full text-slate-700 dark:text-slate-200 active:bg-slate-200/60 dark:active:bg-slate-800 shrink-0">
+              <Icon name="back" />
             </button>
           )}
-          <h1 className="font-semibold text-slate-900 dark:text-white truncate">{title}</h1>
+          <div className="min-w-0">
+            <h1 className="font-bold text-[17px] leading-tight truncate">{title}</h1>
+            {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{subtitle}</p>}
+          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {right}
-          <ThemeToggle />
+          {theme && <ThemeToggle />}
         </div>
       </div>
-    </div>
+    </header>
   );
 }

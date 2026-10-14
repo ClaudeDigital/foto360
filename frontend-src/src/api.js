@@ -48,3 +48,7 @@ export const api = {
 };
 
 export { getToken, getAdminToken };
+
+// Photos are served statically; thumbnails are generated on demand by the server.
+export const photoUrl = (filename) => `/uploads/photos/${filename}`;
+export const thumbUrl = (filename) => `/uploads/thumbs/${filename}`;

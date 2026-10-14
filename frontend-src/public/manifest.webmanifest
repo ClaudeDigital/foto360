@@ -1,0 +1,25 @@
+{
+  "name": "foto360 — Dokumentim & Timelapse",
+  "short_name": "foto360",
+  "description": "Bëj foto çdo ditë në një lokacion dhe krijo video timelapse automatikisht.",
+  "id": "/",
+  "start_url": "/dashboard?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "lang": "sq",
+  "dir": "ltr",
+  "categories": ["photo", "productivity", "utilities"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Lokacionet", "short_name": "Lokacionet", "url": "/dashboard", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

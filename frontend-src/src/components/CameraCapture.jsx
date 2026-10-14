@@ -1,6 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
+import Icon from './Icon.jsx';
+import Spinner from './Spinner.jsx';
 
-export default function CameraCapture({ onCapture, onClose }) {
+// Full-screen camera. `ghostSrc` (the previous photo) can be overlaid semi-transparently
+// so each day's shot lines up with the last one — that's what makes a timelapse smooth.
+export default function CameraCapture({ onCapture, onClose, ghostSrc }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -8,15 +12,16 @@ export default function CameraCapture({ onCapture, onClose }) {
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
   const [flash, setFlash] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [ghost, setGhost] = useState(!!ghostSrc);
+  const [grid, setGrid] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     async function start() {
       setReady(false);
       setError('');
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
-      }
+      streamRef.current?.getTracks().forEach(t => t.stop());
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
@@ -30,7 +35,7 @@ export default function CameraCapture({ onCapture, onClose }) {
         }
         setReady(true);
       } catch (e) {
-        setError('Nuk mund të hapet kamera. Kontrollo lejet e browser-it.');
+        setError('Nuk mund të hapet kamera. Kontrollo lejet e kamerës në cilësimet e telefonit/browser-it.');
       }
     }
     start();
@@ -42,52 +47,87 @@ export default function CameraCapture({ onCapture, onClose }) {
 
   const capture = () => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || busy) return;
     const canvas = canvasRef.current;
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
     setFlash(true);
-    setTimeout(() => setFlash(false), 150);
-    canvas.toBlob(blob => {
-      if (blob) onCapture(blob);
+    setTimeout(() => setFlash(false), 160);
+    navigator.vibrate?.(20);
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      setBusy(true);
+      try { await onCapture(blob); } finally { setBusy(false); }
     }, 'image/jpeg', 0.92);
   };
 
+  const pill = (active) => `h-11 px-3.5 rounded-full backdrop-blur-md flex items-center gap-1.5 text-sm font-semibold transition active:scale-95 ${active ? 'bg-white text-slate-900' : 'bg-black/45 text-white'}`;
+
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+    <div className="fixed inset-0 z-50 bg-black flex flex-col animate-fade-in">
       <div className="relative flex-1 overflow-hidden">
         {error ? (
-          <div className="h-full flex items-center justify-center px-8 text-center text-white/90">
+          <div className="h-full flex flex-col items-center justify-center gap-4 px-8 text-center text-white/90">
+            <Icon name="camera" size={40} />
             <p>{error}</p>
           </div>
         ) : (
-          <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
+          <video ref={videoRef} playsInline muted className={`h-full w-full object-cover ${facing === 'user' ? '-scale-x-100' : ''}`} />
         )}
-        {flash && <div className="absolute inset-0 bg-white animate-pulse" />}
+        {ghost && ghostSrc && !error && (
+          <img src={ghostSrc} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35 pointer-events-none" />
+        )}
+        {grid && !error && (
+          <div className="absolute inset-0 pointer-events-none grid grid-cols-3 grid-rows-3">
+            {Array.from({ length: 9 }).map((_, i) => <div key={i} className="border border-white/25" />)}
+          </div>
+        )}
+        {flash && <div className="absolute inset-0 bg-white" />}
+
         <div className="absolute top-0 inset-x-0 flex items-center justify-between p-4 pt-[max(1rem,env(safe-area-inset-top))]">
-          <button onClick={onClose} className="h-11 w-11 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          <button onClick={onClose} aria-label="Mbyll" className="h-11 w-11 rounded-full bg-black/45 text-white flex items-center justify-center backdrop-blur-md active:scale-95">
+            <Icon name="close" />
+          </button>
+          <div className="flex gap-2">
+            {ghostSrc && (
+              <button onClick={() => setGhost(g => !g)} className={pill(ghost)} aria-pressed={ghost}>
+                <Icon name="ghost" size={18} /> Udhëzues
+              </button>
+            )}
+            <button onClick={() => setGrid(g => !g)} className={pill(grid)} aria-pressed={grid} aria-label="Rrjeta">
+              <Icon name="grid" size={18} />
+            </button>
+          </div>
+        </div>
+        {ghost && ghostSrc && ready && (
+          <p className="absolute bottom-4 inset-x-0 text-center text-xs text-white/85 px-6">
+            Përputh kadrin me foton e fundit për një timelapse të qetë.
+          </p>
+        )}
+      </div>
+      <canvas ref={canvasRef} className="hidden" />
+      <div className="bg-black safe-bottom">
+        <div className="h-28 flex items-center justify-between px-10">
+          <span className="w-12" />
+          <button
+            disabled={!ready || busy}
+            onClick={capture}
+            aria-label="Bëj foto"
+            className="h-[76px] w-[76px] rounded-full border-4 border-white/85 p-1.5 disabled:opacity-50 active:scale-90 transition"
+          >
+            <span className="h-full w-full rounded-full bg-white flex items-center justify-center text-slate-900">
+              {busy && <Spinner className="h-6 w-6" />}
+            </span>
           </button>
           <button
             onClick={() => setFacing(f => (f === 'environment' ? 'user' : 'environment'))}
-            className="h-11 w-11 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur"
+            aria-label="Ndrysho kamerën"
+            className="h-12 w-12 rounded-full bg-white/15 text-white flex items-center justify-center active:scale-90 transition"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0 0 20.5 15"/></svg>
+            <Icon name="flip" />
           </button>
         </div>
-      </div>
-      <canvas ref={canvasRef} className="hidden" />
-      <div className="bg-black safe-bottom flex items-center justify-center py-6">
-        <button
-          disabled={!ready}
-          onClick={capture}
-          className="h-18 w-18 rounded-full border-4 border-white/80 p-1 disabled:opacity-40 active:scale-95 transition"
-          style={{ height: 72, width: 72 }}
-        >
-          <span className="block h-full w-full rounded-full bg-white" />
-        </button>
       </div>
     </div>
   );

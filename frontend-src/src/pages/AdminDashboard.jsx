@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import TopBar from '../components/TopBar.jsx';
+import { FullPageSpinner } from '../components/Spinner.jsx';
 
 const TIER_LABEL = { none: 'Pa plan', limited: 'Limited', full: 'Full' };
 
@@ -52,11 +53,7 @@ export default function AdminDashboard() {
   };
 
   if (!ready) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="h-8 w-8 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />
-      </div>
-    );
+    return <FullPageSpinner />;
   }
 
   return (
@@ -69,7 +66,7 @@ export default function AdminDashboard() {
           </button>
         }
       />
-      <div className="max-w-2xl mx-auto px-5 pt-4 pb-16">
+      <div className="max-w-2xl mx-auto px-4 pt-4 pb-16 safe-bottom">
         {stats && (
           <div className="grid grid-cols-3 gap-2 mb-5">
             {[
@@ -80,33 +77,33 @@ export default function AdminDashboard() {
               ['Lokacione', stats.locations],
               ['Foto', stats.photos]
             ].map(([label, val]) => (
-              <div key={label} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 text-center">
+              <div key={label} className="card rounded-2xl p-3 text-center">
                 <p className="text-xl font-extrabold">{val}</p>
                 <p className="text-[11px] text-slate-500 mt-0.5">{label}</p>
               </div>
             ))}
-            <div className="col-span-3 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 p-3 text-center">
+            <div className="col-span-3 rounded-2xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 p-3 text-center">
               <p className="text-xl font-extrabold text-emerald-700 dark:text-emerald-400">€{stats.revenue}</p>
               <p className="text-[11px] text-emerald-700/70 dark:text-emerald-400/70 mt-0.5">Të ardhura (konfirmuar)</p>
             </div>
           </div>
         )}
 
-        <div className="flex gap-2 mb-4 bg-slate-100 dark:bg-slate-900 rounded-xl p-1">
-          <button onClick={() => setTab('porosite')} className={`flex-1 h-9 rounded-lg text-sm font-semibold transition ${tab === 'porosite' ? 'bg-white dark:bg-slate-800 shadow' : 'text-slate-500'}`}>
+        <div className="segmented mb-4" role="tablist">
+          <button role="tab" aria-selected={tab === 'porosite'} onClick={() => setTab('porosite')}>
             Porositë
           </button>
-          <button onClick={() => setTab('perdorues')} className={`flex-1 h-9 rounded-lg text-sm font-semibold transition ${tab === 'perdorues' ? 'bg-white dark:bg-slate-800 shadow' : 'text-slate-500'}`}>
+          <button role="tab" aria-selected={tab === 'perdorues'} onClick={() => setTab('perdorues')}>
             Përdoruesit
           </button>
         </div>
 
         {tab === 'porosite' && (
           <div>
-            <div className="flex gap-2 mb-3">
+            <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar">
               {['pending', 'confirmed', 'rejected', 'all'].map(s => (
                 <button key={s} onClick={() => setOrderFilter(s)}
-                  className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${orderFilter === s ? 'bg-brand-600 text-white border-brand-600' : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                  className={`shrink-0 text-xs font-semibold px-3.5 py-2 rounded-full border ${orderFilter === s ? 'bg-brand-600 text-white border-brand-600 shadow-glow' : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}>
                   {s === 'pending' ? 'Pritje' : s === 'confirmed' ? 'Konfirmuar' : s === 'rejected' ? 'Refuzuar' : 'Të gjitha'}
                 </button>
               ))}
@@ -114,7 +111,7 @@ export default function AdminDashboard() {
             <div className="flex flex-col gap-2">
               {orders.length === 0 && <p className="text-sm text-slate-500 text-center py-8">Asnjë porosi.</p>}
               {orders.map(o => (
-                <div key={o.id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                <div key={o.id} className="card rounded-2xl p-4">
                   <div className="flex justify-between items-start gap-2">
                     <div>
                       <p className="font-semibold text-sm">{o.user_name}</p>
@@ -134,12 +131,12 @@ export default function AdminDashboard() {
                   {o.status === 'pending' && (
                     <div className="flex gap-2 mt-3">
                       <button disabled={busyId === o.id} onClick={() => decide(o.id, 'approve')}
-                        className="flex-1 h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold disabled:opacity-60">
-                        ✅ Konfirmo
+                        className="flex-1 h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold disabled:opacity-60">
+                        Konfirmo
                       </button>
                       <button disabled={busyId === o.id} onClick={() => decide(o.id, 'reject')}
-                        className="flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold disabled:opacity-60">
-                        ❌ Refuzo
+                        className="flex-1 h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold disabled:opacity-60">
+                        Refuzo
                       </button>
                     </div>
                   )}
@@ -152,7 +149,7 @@ export default function AdminDashboard() {
         {tab === 'perdorues' && (
           <div className="flex flex-col gap-2">
             {users.map(u => (
-              <div key={u.id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex justify-between items-center">
+              <div key={u.id} className="card rounded-2xl p-4 flex justify-between items-center">
                 <div>
                   <p className="font-semibold text-sm">{u.name}</p>
                   <p className="text-xs text-slate-500">{u.email}</p>
