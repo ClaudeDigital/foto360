@@ -293,7 +293,8 @@ app.get('/api/orders/mine', auth, (req, res) => {
 const ROUTER_SECRET = process.env.TELEGRAM_SECRET_TOKEN || '';
 const OTHER_PROJECT_WEBHOOKS = [
   { pattern: /^(confirm_order|reject_order)_\d+$/, url: 'https://turn.gezimm.com/api/telegram/webhook' },
-  { pattern: /^(confirm|cancel)_\d+$/, url: 'https://gesim.gezimm.com/api/telegram/webhook' }
+  { pattern: /^(confirm|cancel)_\d+$/, url: 'https://gesim.gezimm.com/api/telegram/webhook' },
+  { pattern: /^pay_(ok|no)_\d+$/, url: 'https://gjuha.gezimm.com/api/telegram/webhook' }
 ];
 
 async function handleFoto360Callback(update) {
