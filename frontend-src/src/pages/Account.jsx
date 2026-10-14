@@ -6,6 +6,7 @@ import { useTheme } from '../context/ThemeContext.jsx';
 import TopBar from '../components/TopBar.jsx';
 import Icon from '../components/Icon.jsx';
 import InstallApp from '../components/InstallApp.jsx';
+import ReminderToggle from '../components/ReminderToggle.jsx';
 import { TIER_LABEL } from './Dashboard.jsx';
 import { parseDbDate } from '../utils.js';
 
@@ -40,6 +41,8 @@ export default function Account() {
         </div>
 
         <InstallApp />
+
+        <ReminderToggle />
 
         <div className="card divide-y divide-slate-100 dark:divide-slate-800">
           <button onClick={toggle} className="w-full flex items-center gap-3 p-4 text-left">
@@ -76,7 +79,7 @@ export default function Account() {
         <button onClick={() => { logout(); navigate('/', { replace: true }); }} className="btn w-full text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40">
           <Icon name="logout" size={20} /> Dil nga llogaria
         </button>
-        <p className="text-center text-xs text-slate-400 pb-2">foto360 · v1.1</p>
+        <p className="text-center text-xs text-slate-400 pb-2">foto360 · v1.2</p>
       </div>
     </div>
   );

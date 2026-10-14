@@ -463,6 +463,142 @@ app.delete('/api/photos/:id', auth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- Daily photo reminder (Web Push) ----------
+// Every day at REMINDER_TIME (Kosovo time) each user with push turned on gets one
+// notification listing the locations that have no photo uploaded yet today.
+const webpush = require('web-push');
+const REMINDER_TZ = 'Europe/Belgrade';
+const REMINDER_TIME = process.env.REMINDER_TIME || '11:59';
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  endpoint TEXT UNIQUE NOT NULL,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY, value TEXT);
+`);
+
+// VAPID keys are generated once and kept in data/ so subscriptions survive restarts.
+const VAPID_FILE = path.join(DATA_DIR, 'vapid.json');
+let vapid;
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  vapid = { publicKey: process.env.VAPID_PUBLIC_KEY, privateKey: process.env.VAPID_PRIVATE_KEY };
+} else if (fs.existsSync(VAPID_FILE)) {
+  vapid = JSON.parse(fs.readFileSync(VAPID_FILE, 'utf8'));
+} else {
+  vapid = webpush.generateVAPIDKeys();
+  fs.writeFileSync(VAPID_FILE, JSON.stringify(vapid), { mode: 0o600 });
+}
+webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@gezimm.com', vapid.publicKey, vapid.privateKey);
+
+// Wall-clock parts of `date` in Kosovo time.
+function tzParts(date) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+    timeZone: REMINDER_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  }).formatToParts(date).map(x => [x.type, x.value]));
+  return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour, mi: +p.minute, s: +p.second };
+}
+// Start of today's Kosovo day as an SQLite UTC datetime string (matches photos.created_at).
+function kosovoDayStartUtc(now = new Date()) {
+  const p = tzParts(now);
+  const offsetMs = Date.UTC(p.y, p.m - 1, p.d, p.h, p.mi, p.s) - Math.floor(now.getTime() / 1000) * 1000;
+  const start = new Date(Date.UTC(p.y, p.m - 1, p.d) - offsetMs);
+  return start.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+async function sendPush(sub, payload) {
+  try {
+    await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, JSON.stringify(payload), { TTL: 6 * 3600 });
+    return true;
+  } catch (e) {
+    // 404/410: the browser dropped this subscription (app uninstalled, permission revoked).
+    if (e.statusCode === 404 || e.statusCode === 410) {
+      db.prepare('DELETE FROM push_subscriptions WHERE id=?').run(sub.id);
+    } else {
+      console.error('push error', e.statusCode || '', e.body || e.message);
+    }
+    return false;
+  }
+}
+
+function reminderFor(userId) {
+  const since = kosovoDayStartUtc();
+  const missing = db.prepare(`
+    SELECT l.id, l.name FROM locations l
+    WHERE l.user_id=? AND NOT EXISTS (SELECT 1 FROM photos p WHERE p.location_id=l.id AND p.created_at >= ?)
+    ORDER BY l.name`).all(userId, since);
+  if (!missing.length) return null;
+  const names = missing.map(l => l.name);
+  const list = names.length > 3 ? `${names.slice(0, 3).join(', ')} +${names.length - 3}` : names.join(', ');
+  return {
+    title: 'Koha për foton e sotme 📸',
+    body: `Ende s'ke bërë foto sot te: ${list}`,
+    url: missing.length === 1 ? `/lokacioni/${missing[0].id}?kamera=1` : '/dashboard',
+    tag: 'foto360-daily'
+  };
+}
+
+async function sendDailyReminders() {
+  const users = db.prepare('SELECT DISTINCT user_id FROM push_subscriptions').all();
+  let sent = 0;
+  for (const { user_id } of users) {
+    const payload = reminderFor(user_id);
+    if (!payload) continue;
+    const subs = db.prepare('SELECT * FROM push_subscriptions WHERE user_id=?').all(user_id);
+    for (const s of subs) if (await sendPush(s, payload)) sent++;
+  }
+  console.log(`daily reminder: ${sent} notification(s) sent to ${users.length} user(s)`);
+}
+
+// Checked every 30s; app_state remembers the last day sent so a restart never sends twice.
+// Only fires within an hour of REMINDER_TIME, so a server that was down at noon stays quiet.
+const [remH, remM] = REMINDER_TIME.split(':').map(Number);
+setInterval(() => {
+  const p = tzParts(new Date());
+  const today = `${p.y}-${String(p.m).padStart(2, '0')}-${String(p.d).padStart(2, '0')}`;
+  const mins = p.h * 60 + p.mi - (remH * 60 + remM);
+  if (mins < 0 || mins >= 60) return;
+  const last = db.prepare("SELECT value FROM app_state WHERE key='last_reminder_day'").get();
+  if (last && last.value === today) return;
+  db.prepare("INSERT INTO app_state (key, value) VALUES ('last_reminder_day', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(today);
+  sendDailyReminders().catch(e => console.error('daily reminder failed', e));
+}, 30 * 1000);
+
+app.get('/api/push/key', (req, res) => res.json({ publicKey: vapid.publicKey, time: REMINDER_TIME }));
+
+app.post('/api/push/subscribe', auth, (req, res) => {
+  const { endpoint, keys } = req.body || {};
+  if (!endpoint || !/^https:\/\//.test(endpoint) || !keys?.p256dh || !keys?.auth) {
+    return res.status(400).json({ error: 'Abonim i pavlefshëm' });
+  }
+  db.prepare(`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)
+    ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id, p256dh=excluded.p256dh, auth=excluded.auth`)
+    .run(req.userId, endpoint, keys.p256dh, keys.auth);
+  res.json({ ok: true });
+});
+
+app.post('/api/push/unsubscribe', auth, (req, res) => {
+  db.prepare('DELETE FROM push_subscriptions WHERE endpoint=? AND user_id=?').run(req.body?.endpoint || '', req.userId);
+  res.json({ ok: true });
+});
+
+app.post('/api/push/test', auth, async (req, res) => {
+  const subs = db.prepare('SELECT * FROM push_subscriptions WHERE user_id=?').all(req.userId);
+  if (!subs.length) return res.status(400).json({ error: 'Njoftimet nuk janë aktivizuar në këtë pajisje' });
+  const payload = reminderFor(req.userId) || {
+    title: 'foto360', body: `Njoftimet punojnë. Rikujtimi vjen çdo ditë në ${REMINDER_TIME}.`, url: '/dashboard', tag: 'foto360-test'
+  };
+  let sent = 0;
+  for (const s of subs) if (await sendPush(s, payload)) sent++;
+  res.json({ sent });
+});
+
 // ---------- Timelapse (ffmpeg) ----------
 const MONTHS_SQ = ['Janar','Shkurt','Mars','Prill','Maj','Qershor','Korrik','Gusht','Shtator','Tetor','Nëntor','Dhjetor'];
 function formatOverlay(iso) {

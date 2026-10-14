@@ -1,6 +1,6 @@
 // foto360 service worker — makes the app installable and keeps the shell
 // working on flaky mobile connections. API calls always go to the network.
-const VERSION = 'foto360-v1';
+const VERSION = 'foto360-v2';
 const SHELL = `${VERSION}-shell`;
 const RUNTIME = `${VERSION}-runtime`;
 const PRECACHE = ['/', '/index.html', '/manifest.webmanifest', '/logo.svg', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png'];
@@ -55,4 +55,29 @@ self.addEventListener('fetch', (event) => {
       }))
     );
   }
+});
+
+// Daily photo reminder pushed by the server.
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data && event.data.text() }; }
+  event.waitUntil(self.registration.showNotification(data.title || 'foto360', {
+    body: data.body || '',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: data.tag || 'foto360',
+    data: { url: data.url || '/dashboard' }
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || '/dashboard', self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      const win = list.find(c => c.url.startsWith(self.location.origin));
+      if (win) return win.focus().then(w => (w || win).navigate(url));
+      return self.clients.openWindow(url);
+    })
+  );
 });

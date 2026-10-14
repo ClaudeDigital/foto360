@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, photoUrl } from '../api.js';
 import { useToast } from '../context/ToastContext.jsx';
 import TopBar from '../components/TopBar.jsx';
@@ -35,6 +35,7 @@ const PRESETS = [
 export default function LocationView() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
   const [location, setLocation] = useState(null);
   const [photos, setPhotos] = useState([]);
@@ -74,6 +75,14 @@ export default function LocationView() {
   }, [id]);
 
   useEffect(() => { loadAll(); loadTimelapses(); }, [loadAll, loadTimelapses]);
+
+  // Opened from the daily reminder notification: go straight to the camera.
+  useEffect(() => {
+    if (location && searchParams.get('kamera') === '1') {
+      setShowCamera(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [location, searchParams, setSearchParams]);
 
   const startPolling = useCallback(() => {
     clearInterval(pollRef.current);

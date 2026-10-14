@@ -38,6 +38,10 @@ export const api = {
   createTimelapse: (id, body) => request(`/locations/${id}/timelapse`, { method: 'POST', body }),
   timelapses: (id) => request(`/locations/${id}/timelapses`),
   timelapse: (id) => request(`/timelapses/${id}`),
+  pushKey: () => request('/push/key'),
+  pushSubscribe: (sub) => request('/push/subscribe', { method: 'POST', body: sub }),
+  pushUnsubscribe: (endpoint) => request('/push/unsubscribe', { method: 'POST', body: { endpoint } }),
+  pushTest: () => request('/push/test', { method: 'POST' }),
 
   adminLogin: (body) => request('/admin/login', { method: 'POST', body, admin: true }),
   adminMe: () => request('/admin/me', { admin: true }),
